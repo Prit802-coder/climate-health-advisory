@@ -1,0 +1,19 @@
+# Query: london
+# ContextLines: 1
+
+3 results - 1 file
+
+src\App.jsx:
+   33    'Chicago': { temp: 18, aqi: 42, uv: 2, allergen: 'Low', healthIndex: 92, condition: 'cloudy', desc: 'Mild temperatures and clean air. Excellent baseline safety indicators.' },
+   34:   'London': { temp: 15, aqi: 35, uv: 1, allergen: 'Low', healthIndex: 88, condition: 'rainy', desc: 'Brisk, moist conditions. High allergy protection.' },
+   35    'Tokyo': { temp: 26, aqi: 55, uv: 6, allergen: 'Medium', healthIndex: 78, condition: 'sunrise', desc: 'Moderate pollen levels. Safe for outdoor commute.' },
+
+   
+
+  281                        type="text"
+  282:                       placeholder="Search city (e.g. New Delhi, London, Tokyo)..."
+  283                        value={searchQuery}
+
+  312                      <div className="absolute top-[105%] left-0 w-full bg-white rounded-2xl border border-slate-150 shadow-2xl z-30 p-4 text-center text-xs font-medium text-slate-400">
+  313:                       No results for "{searchQuery}". Try London, Tokyo, or Sydney.
+  314                      </div>
