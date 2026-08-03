@@ -49,6 +49,8 @@ const CITY_DATABASE = {
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
   
   // Choose random weather condition on startup
   const [weatherCondition, setWeatherCondition] = useState('sunny');
@@ -378,6 +380,13 @@ export default function App() {
                   <span className="text-3xs font-bold text-blue-600 flex items-center gap-1 mt-1 group">
                     Detailed index breakdown <ChevronRight className="h-3 w-3" />
                   </span>
+
+                  <button
+                    onClick={() => setShowLogin(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all">
+                    <LogIn className="h-4.5 w-4.5" />
+                    Log In
+                  </button>
                 </div>
 
                 {/* Card 2: AI Health Advisory Summary */}
@@ -535,46 +544,47 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16">
             <div className="glass-card rounded-3xl p-6 md:p-8 border border-slate-200/40 bg-white/90 backdrop-blur-md shadow-sm">
               {activeTab === 'Dashboard' && (
-  <DashboardView 
-    weatherData={weatherData} 
-    currentCity={currentCityName} 
-  />
-)}
+                <DashboardView 
+                  weatherData={weatherData} 
+                  currentCity={currentCityName} 
+                />
+              )}
 
-{activeTab === 'Climate Health Index' && (
-  <ClimateHealthIndexView />
-)}
+              {activeTab === 'Climate Health Index' && (
+                <ClimateHealthIndexView />
+              )}
 
-{activeTab === 'Forecast' && (
-  <ForecastView />
-)}
+              {activeTab === 'Forecast' && (
+                <ForecastView />
+              )}
 
-{activeTab === 'Risk Maps' && (
-  <RiskMapsView />
-)}
+              {activeTab === 'Risk Maps' && (
+                <RiskMapsView />
+              )}
 
-{activeTab === 'AI Assistant' && (
-  <AIAssistantView 
-    weatherData={currentCityData} 
-    currentCity={currentCityName} 
-  />
-)}
+              {activeTab === 'AI Assistant' && (
+                <AIAssistantView 
+                  weatherData={currentCityData} 
+                  currentCity={currentCityName} 
+                />
+              )}
 
-{activeTab === 'Citizen Reports' && (
-  <CitizenReportsView />
-)}
+              {activeTab === 'Citizen Reports' && (
+                <CitizenReportsView />
+              )}
 
-{activeTab === 'Hospital Dashboard' && (
-  <HospitalDashboardView />
-)}
+              {activeTab === 'Hospital Dashboard' && (
+                <HospitalDashboardView />
+              )}
 
-{activeTab === 'About' && (
-  <AboutView />
-)}
+              {activeTab === 'About' && (
+                <AboutView />
+              )}
             </div>
           </div>
         )}
       </main>
+      
 
       {/* Editorial Footer */}
       <footer className="mt-auto border-t border-slate-200 bg-white/60 backdrop-blur-md py-6 text-center">

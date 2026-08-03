@@ -4,7 +4,7 @@
  * It will gracefully fall back to local mock data if the Flask backend is offline.
  */
 
-const FLASK_API_BASE = import.meta.env.VITE_FLASK_API_URL || 'http://localhost:5000/api';
+const FLASK_API_BASE = import.meta.env.VITE_FLASK_API_URL || 'https://climate-health-backend-8xgk.onrender.com/api';
 
 // Helper to check if Flask backend is available
 async function request(endpoint, options = {}) {
