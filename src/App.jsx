@@ -181,16 +181,18 @@ export default function App() {
           </nav>
 
           {/* Login / Auth Actions */}
-          <div className="hidden lg:flex items-center gap-3">
-            <button className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all">
-              <LogIn className="h-4.5 w-4.5" />
-              Log In
-            </button>
-            <button className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
-              <UserPlus className="h-4.5 w-4.5" />
-              Sign Up
-            </button>
-          </div>
+         <button
+  onClick={() => setShowLogin(true)}
+  className={`flex items-center gap-2 px-4 py-3 rounded-xl transition
+  ${
+    showLogin
+      ? "bg-blue-600 text-white"
+      : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+  }`}
+>
+  <LogIn size={18}/>
+  <span>Log In</span>
+</button>
 
           {/* Mobile Menu Button */}
           <button 
@@ -382,10 +384,18 @@ export default function App() {
                   </span>
 
                   <button
-                    onClick={() => setShowLogin(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all">
-                    <LogIn className="h-4.5 w-4.5" />
-                    Log In
+                     type="button"
+                      onClick={() => {
+                      console.log("Login clicked");
+
+                      // temporary success message
+                      alert("Login successful");
+
+                      setShowLogin(false);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded"
+                  >
+                    Login
                   </button>
                 </div>
 
@@ -584,6 +594,54 @@ export default function App() {
           </div>
         )}
       </main>
+
+        {showLogin && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+
+    <div className="bg-white p-6 rounded-xl w-80">
+
+      <h2 className="text-xl mb-4">
+        Login
+      </h2>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+
+          console.log("Login clicked");
+          alert("Login successful");
+
+          setShowLogin(false);
+        }}
+      >
+
+        <input
+          type="email"
+          placeholder="Email"
+          className="border p-2 w-full mb-3 rounded"
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          className="border p-2 w-full mb-3 rounded"
+        />
+
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-600 text-white rounded w-full"
+        >
+          Login
+        </button>
+
+      </form>
+
+    </div>
+
+  </div>
+)}
+
+
       
 
       {/* Editorial Footer */}
