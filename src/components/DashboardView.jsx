@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { getHealthIndex } from "../services/api";
+import { getWeather } from "../services/api";
 import { Shield, Activity, Calendar, Clock, AlertTriangle, CheckCircle2, User, Briefcase, Plus, Heart } from 'lucide-react';
 
 export default function DashboardView({ weatherData, currentCity }) {
@@ -11,7 +11,7 @@ export default function DashboardView({ weatherData, currentCity }) {
 
         if(currentCity){
 
-            getHealthIndex(currentCity)
+            getWeather(currentCity)
             .then((data)=>{
                 setHealthData(data);
             })

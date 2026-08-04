@@ -1,4 +1,4 @@
-import { getWeather } from "./api/weather";
+import { getWeather } from "./services/api";
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sun, Wind, Thermometer, Sparkles, Search, Menu, X, Shield, Clock, Calendar, 
@@ -82,20 +82,20 @@ export default function App() {
 
  const handleSelectCity = async (city) => {
   setLoading(true);
+  setSearchQuery(city);        // update input box text
+  setCurrentCityName(city);    // update the "current city" used elsewhere
+  setShowSuggestions(false);   // close the dropdown
 
   try {
     const data = await getWeather(city);
-
-    console.log(data);
-
     setWeatherData(data);
-    setCurrentCityName(data.city);
-
-    setSearchQuery("");
-    setShowSuggestions(false);
   } catch (err) {
     console.error(err);
-    alert("City not found");
+    if (err.response) {
+      alert(err.response.data.error || "City not found");
+    } else {
+      alert("Cannot connect to server. Please make sure the backend is running.");
+    }
   } finally {
     setLoading(false);
   }
@@ -181,18 +181,33 @@ export default function App() {
           </nav>
 
           {/* Login / Auth Actions */}
-         <button
-  onClick={() => setShowLogin(true)}
-  className={`flex items-center gap-2 px-4 py-3 rounded-xl transition
-  ${
-    showLogin
-      ? "bg-blue-600 text-white"
-      : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-  }`}
->
-  <LogIn size={18}/>
-  <span>Log In</span>
-</button>
+          <div className="hidden lg:flex items-center gap-2">
+            <button
+              onClick={() => setShowLogin(true)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition
+                ${
+                  showLogin
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                }`}
+            >
+              <LogIn size={18} />
+              <span>Log In</span>
+            </button>
+
+            <button
+              onClick={() => setShowSignup(true)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition
+                ${
+                  showSignup
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                }`}
+            >
+              <UserPlus size={18} />
+              <span>Sign Up</span>
+            </button>
+          </div>
 
           {/* Mobile Menu Button */}
           <button 
@@ -596,52 +611,107 @@ export default function App() {
       </main>
 
         {showLogin && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
 
-    <div className="bg-white p-6 rounded-xl w-80">
+            <div className="bg-white p-6 rounded-xl w-80">
 
-      <h2 className="text-xl mb-4">
-        Login
-      </h2>
+              <h2 className="text-xl mb-4">
+                Login
+              </h2>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
 
-          console.log("Login clicked");
-          alert("Login successful");
+                  console.log("Login clicked");
+                  alert("Login successful");
 
-          setShowLogin(false);
-        }}
-      >
+                  setShowLogin(false);
+                }}
+              >
 
-        <input
-          type="email"
-          placeholder="Email"
-          className="border p-2 w-full mb-3 rounded"
-        />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="border p-2 w-full mb-3 rounded"
+                  required
+                />
 
-        <input
-          type="password"
-          placeholder="Password"
-          className="border p-2 w-full mb-3 rounded"
-        />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  className="border p-2 w-full mb-3 rounded"
+                  required
+                />
 
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded w-full"
-        >
-          Login
-        </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded w-full"
+                >
+                  Login
+                </button>
 
-      </form>
+              </form>
 
-    </div>
+            </div>
 
-  </div>
-)}
+          </div>
+        )}
 
+        {showSignup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white p-6 rounded-xl w-80">
+              <h2 className="text-xl font-semibold mb-4">
+                Sign Up
+              </h2>
 
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  alert("Account created successfully!");
+                  setShowSignup(false);
+                }}
+                className="space-y-4"
+              >
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  className="w-full border rounded-lg px-3 py-2"
+                  required
+                />
+
+                <input
+                  type="email"
+                  placeholder="Email"
+                  className="w-full border rounded-lg px-3 py-2"
+                  required
+                />
+
+                <input
+                  type="password"
+                  placeholder="Password"
+                  className="w-full border rounded-lg px-3 py-2"
+                  required
+                />
+
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Create Account
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowSignup(false)}
+                  className="w-full border py-2 rounded-lg"
+                >
+                  Cancel
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       
 
       {/* Editorial Footer */}

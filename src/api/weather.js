@@ -5,6 +5,6 @@ const API = axios.create({
 });
 
 export const getWeather = async (city) => {
-    const response = await API.get(`/health-index?city=${city}`);
+    const response = await API.get(`/weather?city=${encodeURIComponent(city)}`);
     return response.data;
 };
