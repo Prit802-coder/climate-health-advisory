@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://climate-health-backend-2-31iq.onrender.com",
 });
 
 export const getWeather = async (city) => {
