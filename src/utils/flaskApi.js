@@ -9,7 +9,7 @@ const FASTAPI_BASE = import.meta.env.VITE_FLASK_API_URL || 'http://localhost:500
 async function request(endpoint, options = {}) {
   const url = `${FASTAPI_BASE}${endpoint}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   const token = localStorage.getItem('clima_auth_token');
   const headers = {
