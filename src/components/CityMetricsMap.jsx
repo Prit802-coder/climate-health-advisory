@@ -3,24 +3,6 @@ import { Layers, ChevronRight, Activity } from 'lucide-react';
 import { getAQICategory } from '../utils/api';
 
 export default function CityMetricsMap({ cities, activeCity, onCitySelect }) {
-  
-  // Custom mock AQI for sidebar comparison to make it look active and populated
-  const getCitySimulatedAQI = (cityName) => {
-    switch (cityName) {
-      case "Patna": return 242;
-      case "Bhopal": return 85;
-      case "Lucknow": return 188;
-      case "Indore": return 68;
-      case "Surat": return 125;
-      case "Visakhapatnam": return 55;
-      case "Jaipur": return 165;
-      case "Nagpur": return 112;
-      case "Coimbatore": return 42;
-      case "Guwahati": return 135;
-      default: return 90;
-    }
-  };
-
   return (
     <div className="glass-panel p-6 rounded-2xl h-full flex flex-col justify-between gap-4 glass-panel-hover">
       {/* Header */}
@@ -38,9 +20,10 @@ export default function CityMetricsMap({ cities, activeCity, onCitySelect }) {
       <div className="space-y-2.5 overflow-y-auto max-h-[360px] pr-1.5 scrollbar-thin flex-1">
         {cities.map((city) => {
           const isActive = city.name === activeCity.name;
-          const simAqi = getCitySimulatedAQI(city.name);
-          const aqiInfo = getAQICategory(simAqi);
-          
+          const cityAqi = Number(city.aqi);
+          const hasAqi = Number.isFinite(cityAqi);
+          const aqiInfo = hasAqi ? getAQICategory(cityAqi) : null;
+
           return (
             <div
               key={city.name}
@@ -62,12 +45,15 @@ export default function CityMetricsMap({ cities, activeCity, onCitySelect }) {
               </div>
 
               {/* Status Badge */}
-              <div className="flex items-center gap-2 shrink-0">
+              {hasAqi && aqiInfo ? (
                 <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${aqiInfo.bg} ${aqiInfo.color} ${aqiInfo.border}`}>
-                  AQI {simAqi}
+                  AQI {cityAqi}
                 </div>
-                <ChevronRight className={`h-3.5 w-3.5 transition ${isActive ? "text-emerald-400 translate-x-0.5" : "text-slate-650"}`} />
-              </div>
+              ) : (
+                <div className="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border border-slate-700 text-slate-400">
+                  AQI N/A
+                </div>
+              )}
             </div>
           );
         })}
@@ -78,7 +64,7 @@ export default function CityMetricsMap({ cities, activeCity, onCitySelect }) {
         <span className="flex items-center gap-1">
           <Activity className="h-3 w-3 text-emerald-500" /> Comparative Nodes: {cities.length}
         </span>
-        <span>Simulated Broadcast: Live</span>
+        <span>Backend City Data</span>
       </div>
     </div>
   );

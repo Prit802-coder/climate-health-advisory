@@ -29,95 +29,45 @@ export default function AIAssistantView({ weatherData, currentCity }) {
   }, [messages, isTyping]);
 
   const simulateAIResponse = async (userQuery) => {
-    setIsTyping(true);
+  setIsTyping(true);
 
-    try {
-      // Attempt to query the Flask backend
-      const response = await queryAIChat(userQuery, { weatherData, currentCity });
-      setMessages(prev => [
-        ...prev,
-        {
-          id: prev.length + 2,
-          sender: 'ai',
-          text: response.reply,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ]);
-      setIsTyping(false);
-    } catch (err) {
-      // Fallback to local simulated mock response on failure
-      setTimeout(() => {
-        let aiText = '';
-        const queryLower = userQuery.toLowerCase();
+  try {
+    const response = await queryAIChat(userQuery, {
+      weatherData,
+      currentCity
+    });
 
-        if (queryLower.includes('asthma') || queryLower.includes('humidity')) {
-          aiText = `High ambient humidity combined with elevated temperatures creates heavy, particulate-laden air that can cause airway constriction. Here are immediate clinical guidelines:
-          
-• **Maintain Inhaler Access**: Keep rescue bronchodilators on hand at all times.
-• **Air Filtration**: Run air-conditioning in dehumidify mode to keep indoor humidity below 50%.
-• **Trigger Mitigation**: Pollen count is currently elevated. Avoid early morning outdoors, when pollen counts peak.
-• **Symptom Monitoring**: Watch for minor chest tightness or increased coughing, which indicates early hyperreactivity. Seek cool indoor environments immediately.`;
-        } else if (queryLower.includes('run') || queryLower.includes('exercise') || queryLower.includes('safe')) {
-          const aqi = weatherData?.aqi || 68;
-          const temp = weatherData?.temp || 24;
-          
-          if (aqi > 100 || temp > 30) {
-            aiText = `Based on current telemetry in **${currentCity}** (Temp: ${temp}°C, AQI: ${aqi}), high-intensity outdoor exercises are **Not Recommended**:
-            
-• **Ventilatory Strain**: Elevated PM2.5 counts trigger deep pulmonary alveolar inflammation during aerobic respiration.
-• **Thermal Dehydration**: High temperature causes peripheral vasodilation, increasing cardiac load.
-• **Alternative**: We advise shifting cardiovascular sessions indoors today or scheduling them post-sunset when the ozone level dissipates.`;
-          } else {
-            aiText = `Current environmental conditions in **${currentCity}** (Temp: ${temp}°C, AQI: ${aqi}) are **Favorable** for outdoor physical training:
-            
-• **Optimal AQI**: Microparticle loading is within healthy physiological margins.
-• **Thermoregulation**: Ambient air is within normal homeostatic zones.
-• **Advice**: Stay hydrated and apply SPF 30+ cream if exercising under direct sun exposure.`;
-          }
-        } else if (queryLower.includes('heat') || queryLower.includes('exhaustion') || queryLower.includes('prevent')) {
-          aiText = `Heat exhaustion is a critical clinical condition that occurs when the body overproduces thermal energy and cannot cool itself. 
-          
-**Early Indicator Symptoms:**
-1. Profuse, cold sweating with clammy skin.
-2. Orthostatic dizziness, lightheadedness, or sudden headache.
-3. Rapid, thready pulse rate.
-4. Mild muscular cramps or nausea.
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        sender: 'ai',
+        text: response.reply || 'The backend returned an empty response.',
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      }
+    ]);
+  } catch (err) {
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        sender: 'ai',
+        text: 'Sorry, I could not connect to the AI service. Please check that the backend is running and try again.',
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      }
+    ]);
 
-**Immediate Preventive Protocols:**
-• **Hydration**: Consume 250ml electrolyte/saline solutions every 20-30 minutes. Plain water alone may lead to hyponatremia.
-• **Shade Recovery**: Move the subject to a shaded, well-ventilated or air-conditioned area immediately.
-• **Cooling**: Apply cold compresses or wet towels to major pulse junctions (neck, armpits, groin).`;
-        } else if (queryLower.includes('heart') || queryLower.includes('aqi') || queryLower.includes('cardio')) {
-          aiText = `Fine particulate matter (PM2.5) enters the pulmonary vascular bed, crossing directly into the bloodstream to cause immediate vascular wall irritation:
-          
-• **Inflammation & Plaque**: Systemic inflammation can cause atherosclerotic plaques to rupture, triggering cardiac events.
-• **Increased Pressure**: Particulates trigger autonomic nervous responses, increasing heart rate and blood pressure.
-• **Cardiac Care Guidance**: 
-    - Restrict outdoor physical excursions when the AQI exceeds 100.
-    - Ensure regular intake of prescribed anti-hypertensive and cardioprotective medication.
-    - Install HEPA air purifiers in living quarters.`;
-        } else {
-          aiText = `Thank you for your inquiry about climate-health conditions in **${currentCity}**. Based on active monitoring:
-          
-• **Precautionary Stance**: The aggregate Climate Health Index is currently at ${weatherData?.healthIndex || 72} (Fair).
-• **General Advice**: Focus on regular hydration, check localized AQI indicators prior to commuting, and consider wearing light face filters if traveling through highly congested industrial wards.
-
-Let me know if you would like me to detail specific rules for respiratory, cardiovascular, or pediatric health groups.`;
-        }
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: prev.length + 2,
-            sender: 'ai',
-            text: aiText,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]);
-        setIsTyping(false);
-      }, 1000);
-    }
-  };
+    console.error('AI Assistant API error:', err);
+  } finally {
+    setIsTyping(false);
+  }
+};
 
   const handleSend = (textToSend = inputText) => {
     if (!textToSend.trim()) return;

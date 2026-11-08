@@ -1,17 +1,27 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, User, MapPin, Activity, Flame, ShieldAlert, Sparkles, Send } from 'lucide-react';
-import { submitCitizenReport } from '../utils/flaskApi';
+import { submitCitizenReport, getCitizenReports } from '../utils/flaskApi';
 
-export default function CitizenReportsView() {
-  const [reports, setReports] = useState([
-    { id: 1, name: 'A. K.', ward: 'Ward C', symptom: 'severe_coughing', severity: 'Severe', desc: 'Dense industrial smoke causing asthma exacerbation in children.', time: '12 mins ago' },
-    { id: 2, name: 'M. R.', ward: 'Ward A', symptom: 'heat_rash', severity: 'Moderate', desc: 'Intense heat indexes causing body rashes and dehydration during afternoon delivery shifts.', time: '45 mins ago' },
-    { id: 3, name: 'S. T.', ward: 'Ward E', symptom: 'itchy_eyes', severity: 'Mild', desc: 'High pollen allergen spikes causing nasal and ocular irritation.', time: '2 hours ago' },
-    { id: 4, name: 'D. P.', ward: 'Ward C', symptom: 'breathing_difficulty', severity: 'Severe', desc: 'Heavy particulate smell in the air making breathing shallow.', time: '3 hours ago' }
-  ]);
+export default function CitizenReportsView({ currentUser }) {
+  const [reports, setReports] = useState([]);
+
+  // Load latest reports from FastAPI backend on mount
+  useEffect(() => {
+    async function loadReports() {
+      try {
+        const data = await getCitizenReports();
+        if (Array.isArray(data)) {
+          setReports(data);
+        }
+      } catch (err) {
+        console.log("Using cached citizen reports:", err.message);
+      }
+    }
+    loadReports();
+  }, []);
 
   // Form State
-  const [formName, setFormName] = useState('');
+  const [formName, setFormName] = useState(currentUser?.full_name || '');
   const [formWard, setFormWard] = useState('Ward A');
   const [formSymptom, setFormSymptom] = useState('breathing_difficulty');
   const [formSeverity, setFormSeverity] = useState('Moderate');
@@ -19,44 +29,48 @@ export default function CitizenReportsView() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   // Submit Handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formDesc.trim()) return;
+  
+const [isSubmitting, setIsSubmitting] = useState(false);
+const [submitError, setSubmitError] = useState('');
 
-    const reportData = {
-      name: formName.trim() || 'Anonymous',
-      ward: formWard,
-      symptom: formSymptom,
-      severity: formSeverity,
-      desc: formDesc
-    };
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    try {
-      const response = await submitCitizenReport(reportData);
-      const newReport = response.report || { ...reportData, id: reports.length + 1, time: 'Just now' };
-      setReports(prev => [newReport, ...prev]);
-    } catch (err) {
-      // Fallback local logic on error
-      const newReport = {
-        id: reports.length + 1,
-        name: reportData.name,
-        ward: reportData.ward,
-        symptom: reportData.symptom,
-        severity: reportData.severity,
-        desc: reportData.desc,
-        time: 'Just now'
-      };
-      setReports(prev => [newReport, ...prev]);
-    }
+  if (!formDesc.trim() || isSubmitting) return;
+
+  const reportData = {
+    name: formName.trim() || 'Anonymous',
+    ward: formWard,
+    symptom: formSymptom,
+    severity: formSeverity,
+    desc: formDesc.trim()
+  };
+
+  setIsSubmitting(true);
+  setSubmitError('');
+  setIsSuccess(false);
+
+  try {
+    await submitCitizenReport(reportData);
+
+    const latestReports = await getCitizenReports();
+    setReports(latestReports);
 
     setIsSuccess(true);
     setFormName('');
     setFormDesc('');
-    
-    setTimeout(() => {
-      setIsSuccess(false);
-    }, 4000);
-  };
+
+    setTimeout(() => setIsSuccess(false), 4000);
+
+  } catch (err) {
+    setSubmitError(
+      err.message || 'Unable to submit report. Please try again.'
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   // Symptom label helper
   const getSymptomLabel = (sym) => {
@@ -185,11 +199,18 @@ export default function CitizenReportsView() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Send className="h-4 w-4" />
-                Submit Safety Report
+                {isSubmitting ? 'Submitting...' : 'Submit Safety Report'}
               </button>
+
+              {submitError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-center">
+                  {submitError}
+                </div>
+              )}
 
               {isSuccess && (
                 <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-2xs font-semibold rounded-xl text-center animate-pulse">

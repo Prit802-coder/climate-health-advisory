@@ -1,125 +1,211 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { getWeather } from "../services/api";
+import {
+  getWeather,
+  getHourlyForecast,
+  getRiskAssessment
+} from "../services/api";
 import { Shield, Activity, Calendar, Clock, AlertTriangle, CheckCircle2, User, Briefcase, Plus, Heart } from 'lucide-react';
 
-export default function DashboardView({ weatherData, currentCity }) {
+export default function DashboardView({ weatherData, currentCity, currentUser }) {
 
-  const [healthData, setHealthData] = useState(null);
+ const [healthData, setHealthData] = useState(null);
+ const [weatherLoading, setWeatherLoading] = useState(false);
+ const [weatherError, setWeatherError] = useState('');
 
+ const [hourlyForecast, setHourlyForecast] = useState([]);
+const [forecastLoading, setForecastLoading] = useState(false);
+const [forecastError, setForecastError] = useState('');
+const [riskCalculation, setRiskCalculation] = useState({
+  score: 0,
+  level: 'Calculating',
+  color: 'text-slate-500 bg-slate-50 border-slate-200',
+  ring: 'border-slate-300',
+  modifiers: []
+});
+const [riskLoading, setRiskLoading] = useState(false);
+const [riskError, setRiskError] = useState('');
 
-    useEffect(()=>{
+  useEffect(() => {
+  if (!currentCity) return;
 
-        if(currentCity){
+  setWeatherLoading(true);
+  setWeatherError('');
 
-            getWeather(currentCity)
-            .then((data)=>{
-                setHealthData(data);
-            })
-            .catch((error)=>{
-                console.log(error);
-            });
+  getWeather(currentCity)
+    .then((data) => {
+      setHealthData(data);
+    })
+    .catch((error) => {
+      console.error('Weather API error:', error);
+      setWeatherError('Unable to load live weather data.');
+      setHealthData(null);
+    })
+    .finally(() => {
+      setWeatherLoading(false);
+    });
+}, [currentCity]);
 
-        }
+useEffect(() => {
+  if (!currentCity) return;
 
-    },[currentCity]);
+  setForecastLoading(true);
+  setForecastError('');
+
+  getHourlyForecast(currentCity)
+    .then((data) => {
+      setHourlyForecast(Array.isArray(data) ? data : []);
+    })
+    .catch((error) => {
+      console.error('Hourly forecast API error:', error);
+      setForecastError('Unable to load forecast data.');
+      setHourlyForecast([]);
+    })
+    .finally(() => {
+      setForecastLoading(false);
+    });
+}, [currentCity]);
+
   // Personalized Risk Profile State
   const [profile, setProfile] = useState({
-    age: 32,
-    occupation: 'indoor', // 'indoor' or 'outdoor'
+    age: currentUser?.age || 32,
+    occupation: currentUser?.occupation || 'indoor', // 'indoor' or 'outdoor'
     conditions: {
-      asthma: false,
-      cardiovascular: false,
-      allergies: true,
-      copd: false
+      asthma: Boolean(currentUser?.conditions?.asthma),
+      cardiovascular: Boolean(currentUser?.conditions?.cardiovascular),
+      allergies: currentUser?.conditions?.allergies !== undefined ? Boolean(currentUser.conditions.allergies) : true,
+      copd: Boolean(currentUser?.conditions?.copd)
     }
   });
 
+  // Sync profile when logged in user changes
+  useEffect(() => {
+    if (currentUser) {
+      setProfile(p => ({
+        ...p,
+        age: currentUser.age || p.age,
+        occupation: currentUser.occupation || p.occupation,
+        conditions: {
+          asthma: Boolean(currentUser.conditions?.asthma),
+          cardiovascular: Boolean(currentUser.conditions?.cardiovascular),
+          allergies: Boolean(currentUser.conditions?.allergies),
+          copd: Boolean(currentUser.conditions?.copd)
+        }
+      }));
+    }
+  }, [currentUser]);
+
   // Planned Activity State
   const [plannerActivity, setPlannerActivity] = useState('jogging');
-  const [plannerTime, setPlannerTime] = useState('08:00');
+  const [plannerTime, setPlannerTime] = useState('');
   const [plannerDuration, setPlannerDuration] = useState('60');
 
   // Trigger values from weatherData or defaults
-  const aqi = weatherData?.aqi ?? 68;
-  const temp = weatherData?.temperature ?? 24;
-  const uv = weatherData?.uv ?? 4;
-  const humidity = weatherData?.humidity ?? 62;
-  const wind = weatherData?.wind_speed ?? 0;
-  const condition = weatherData?.condition ?? "Clear";
+  const aqi = healthData?.aqi ?? weatherData?.aqi ?? 68;
+  const temp = healthData?.temperature ?? weatherData?.temperature ?? 24;
+  const uv = healthData?.uv ?? weatherData?.uv ?? 4;
+  const humidity = healthData?.humidity ?? weatherData?.humidity ?? 62;
+  const wind = healthData?.wind_speed ?? weatherData?.wind_speed ?? 0;
+  const condition = healthData?.condition ?? weatherData?.condition ?? "Clear";
 
   // 1. Personalized Risk Calculation
-  const riskCalculation = useMemo(() => {
-    let baseScore = 20;
+  // Personalized Risk Assessment from FastAPI
+useEffect(() => {
+  let isActive = true;
 
-    // Environmental impacts
-    baseScore += (aqi / 3); 
-    baseScore += Math.max(0, (temp - 22) * 1.5); 
-    baseScore += (uv * 3);
+  const calculateRisk = async () => {
+    setRiskLoading(true);
+    setRiskError('');
 
-    // Profile modifiers
-    let modifiers = [];
-    
-    // Age modifiers
-    if (profile.age < 12) {
-      baseScore += 12;
-      modifiers.push('Sensitive age group (Child)');
-    } else if (profile.age > 65) {
-      baseScore += 20;
-      modifiers.push('Vulnerable age group (Senior Citizen)');
-    }
+    try {
+      const profileData = {
+        age: Number(profile.age),
+        occupation: profile.occupation,
+        conditions: profile.conditions
+      };
 
-    // Occupation modifier
-    if (profile.occupation === 'outdoor') {
-      baseScore += 15;
-      modifiers.push('High exposure due to outdoor occupation');
-    }
+      const environmentalData = {
+        aqi: Number(aqi),
+        temp: Number(temp),
+        uv: Number(uv),
+        humidity: Number(humidity),
+        pollen: Number(healthData?.pollen ?? 0)
+      };
 
-    // Health condition modifiers
-    if (profile.conditions.asthma) {
-      baseScore += 25;
-      modifiers.push('Pre-existing Asthma');
-    }
-    if (profile.conditions.cardiovascular) {
-      baseScore += 25;
-      modifiers.push('Pre-existing Cardiovascular condition');
-    }
-    if (profile.conditions.allergies) {
-      baseScore += 10;
-      modifiers.push('Seasonal pollen allergy');
-    }
-    if (profile.conditions.copd) {
-      baseScore += 30;
-      modifiers.push('Pre-existing COPD risk');
-    }
+      const result = await getRiskAssessment(
+        profileData,
+        environmentalData
+      );
 
-    // Clamp score
-    const finalScore = Math.min(100, Math.round(baseScore));
+      if (isActive) {
+        setRiskCalculation(result);
+      }
+    } catch (error) {
+      console.error('Risk Assessment API error:', error);
 
-    let riskLevel = 'Low';
-    let riskColor = 'text-green-600 bg-green-50 border-green-200';
-    let ringColor = 'border-green-500';
-    if (finalScore > 70) {
-      riskLevel = 'Extreme';
-      riskColor = 'text-red-700 bg-red-50 border-red-200';
-      ringColor = 'border-red-500';
-    } else if (finalScore > 45) {
-      riskLevel = 'Moderate';
-      riskColor = 'text-orange-600 bg-orange-50 border-orange-200';
-      ringColor = 'border-orange-500';
+      if (isActive) {
+        setRiskError('Unable to calculate risk. Please check backend connection.');
+      }
+    } finally {
+      if (isActive) {
+        setRiskLoading(false);
+      }
     }
+  };
 
-    return { score: finalScore, level: riskLevel, color: riskColor, ring: ringColor, modifiers };
-  }, [profile, aqi, temp, uv]);
+  calculateRisk();
+
+  return () => {
+    isActive = false;
+  };
+}, [profile, aqi, temp, uv, humidity, healthData]);
 
   // Hourly slots for Safe Time Planner
-  const hourlySlots = [
-    { time: '06:00', label: 'Early Morning', temp: 19, aqi: 45, uv: 1, wind: 8 },
-    { time: '08:00', label: 'Morning Commute', temp: 22, aqi: 52, uv: 2, wind: 10 },
-    { time: '12:00', label: 'Midday Peak', temp: 29, aqi: 75, uv: 8, wind: 12 },
-    { time: '15:00', label: 'Late Afternoon', temp: 28, aqi: 82, uv: 5, wind: 14 },
-    { time: '18:00', label: 'Evening', temp: 23, aqi: 60, uv: 1, wind: 9 },
-    { time: '21:00', label: 'Night', temp: 20, aqi: 50, uv: 0, wind: 7 }
-  ];
+ // Upcoming 3-hour forecast slots from the backend
+const hourlySlots = useMemo(() => {
+  const now = new Date();
+
+  return hourlyForecast
+    .map((item) => {
+      // OpenWeather forecast timestamps are UTC
+      const forecastDate = new Date(
+        `${item.datetime.replace(' ', 'T')}Z`
+      );
+
+      return {
+        value: forecastDate.toISOString(),
+        time: forecastDate.toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
+        label: forecastDate.toLocaleDateString('en-IN', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        }),
+        temp: item.temp,
+        aqi: aqi,
+        uv: uv,
+        wind: item.wind_speed,
+        condition: item.condition,
+        humidity: item.humidity,
+        rainProbability: item.rain_probability,
+      };
+    })
+    .filter((slot) => new Date(slot.value) >= now)
+    .slice(0, 6);
+}, [hourlyForecast, aqi, uv]);
+
+// Automatically select the first available forecast slot
+useEffect(() => {
+  if (hourlySlots.length > 0) {
+    setPlannerTime((previous) =>
+      hourlySlots.some((slot) => slot.value === previous)
+        ? previous
+        : hourlySlots[0].value
+    );
+  }
+}, [hourlySlots]);
 
   // Helper to evaluate health risk of a specific slot
   const getSlotSafety = (slot) => {
@@ -153,39 +239,42 @@ export default function DashboardView({ weatherData, currentCity }) {
 
   // Planned Activity Advice
   const plannerAdvice = useMemo(() => {
-    const timeHr = parseInt(plannerTime.split(':')[0]);
-    let activeSlot = hourlySlots[0];
-    
-    // Find closest slot
-    let minDiff = 24;
-    hourlySlots.forEach(s => {
-      const sHr = parseInt(s.time.split(':')[0]);
-      const diff = Math.abs(sHr - timeHr);
-      if (diff < minDiff) {
-        minDiff = diff;
-        activeSlot = s;
-      }
-    });
+  const activeSlot =
+    hourlySlots.find((slot) => slot.value === plannerTime) ||
+    hourlySlots[0] || {
+      time: '--:--',
+      label: 'Waiting for forecast',
+      temp: temp,
+      aqi: aqi,
+      uv: uv,
+      wind: wind,
+      condition: condition,
+    };
 
-    const safety = getSlotSafety(activeSlot);
-    
-    let activityNote = '';
-    if (plannerActivity === 'jogging') {
-      activityNote = safety.status === 'Safe' 
-        ? 'Great cardiovascular conditions! Go ahead and enjoy your run.' 
-        : 'High breathing strain predicted. Consider indoor cardio / treadmill today.';
-    } else if (plannerActivity === 'outdoor_work') {
-      activityNote = safety.status === 'Safe'
-        ? 'Safe for normal workloads. Stay hydrated.'
-        : 'Take 15-minute breaks every hour in shade. Drink electrolyte solutions.';
-    } else {
-      activityNote = safety.status === 'Safe'
-        ? 'Favorable environment for light travel.'
-        : 'Limit outdoor stay to essential needs only.';
-    }
+  const safety = getSlotSafety(activeSlot);
 
-    return { safety, note: activityNote, slot: activeSlot };
-  }, [plannerTime, plannerActivity, profile]);
+  let activityNote = '';
+
+  if (plannerActivity === 'jogging') {
+    activityNote = safety.status === 'Safe'
+      ? 'Conditions appear favorable for outdoor activity. Stay hydrated.'
+      : 'Environmental conditions may increase breathing strain. Consider indoor cardio.';
+  } else if (plannerActivity === 'outdoor_work') {
+    activityNote = safety.status === 'Safe'
+      ? 'Conditions appear favorable for outdoor work. Stay hydrated.'
+      : 'Take regular breaks in the shade and stay hydrated.';
+  } else {
+    activityNote = safety.status === 'Safe'
+      ? 'Conditions appear favorable for light travel.'
+      : 'Consider limiting unnecessary outdoor exposure.';
+  }
+
+  return {
+    safety,
+    note: activityNote,
+    slot: activeSlot,
+  };
+}, [plannerTime, plannerActivity, profile, hourlySlots, aqi, uv, temp, wind, condition]);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -334,12 +423,11 @@ export default function DashboardView({ weatherData, currentCity }) {
                     onChange={(e) => setPlannerTime(e.target.value)}
                     className="w-full p-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="06:00">06:00 AM (Dawn)</option>
-                    <option value="08:00">08:00 AM (Morning)</option>
-                    <option value="12:00">12:00 PM (Noon)</option>
-                    <option value="15:00">03:00 PM (Afternoon)</option>
-                    <option value="18:00">06:00 PM (Dusk)</option>
-                    <option value="21:00">09:00 PM (Night)</option>
+                    {hourlySlots.map((slot) => (
+                      <option key={slot.value} value={slot.value}>
+                        {slot.label} - {slot.time}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -375,10 +463,13 @@ export default function DashboardView({ weatherData, currentCity }) {
 
                 <div className="space-y-2">
                   <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                    {plannerActivity.replace('_', ' ').toUpperCase()} at {plannerTime} ({plannerAdvice.slot.label})
+                    {plannerActivity.replace('_', ' ').toUpperCase()} at {plannerAdvice.slot.time} ({plannerAdvice.slot.label})
                   </h4>
                   <p className="text-xs text-slate-600 font-medium leading-relaxed">{plannerAdvice.note}</p>
                   <p className="text-2xs text-slate-400 italic mt-1">{plannerAdvice.safety.desc}</p>
+                  <p className="text-xs text-slate-500 text-center">
+                    Forecast condition: {plannerAdvice.slot.condition || 'Unavailable'}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 bg-white rounded-lg p-3 border border-slate-100">
@@ -387,11 +478,11 @@ export default function DashboardView({ weatherData, currentCity }) {
                     <span className="text-xs font-bold text-slate-800">{plannerAdvice.slot.temp}°C</span>
                   </div>
                   <div className="text-center border-x border-slate-100">
-                    <span className="block text-2xs text-slate-400 font-medium">Est AQI</span>
+                    <span className="block text-2xs text-slate-400 font-medium">Current AQI</span>
                     <span className="text-xs font-bold text-slate-800">{plannerAdvice.slot.aqi}</span>
                   </div>
                   <div className="text-center">
-                    <span className="block text-2xs text-slate-400 font-medium">UV Exposure</span>
+                    <span className="block text-2xs text-slate-400 font-medium">Current UV</span>
                     <span className="text-xs font-bold text-slate-800">{plannerAdvice.slot.uv} / 10</span>
                   </div>
                 </div>
@@ -404,7 +495,7 @@ export default function DashboardView({ weatherData, currentCity }) {
               <div className="grid grid-cols-6 gap-2">
                 {hourlySlots.map((s) => {
                   const evalRes = getSlotSafety(s);
-                  const isSelected = plannerTime === s.time;
+                 const isSelected = plannerTime === s.value;
                   return (
                     <button
                       key={s.time}
@@ -456,8 +547,7 @@ export default function DashboardView({ weatherData, currentCity }) {
                       cy="72"
                       r="62"
                       stroke={
-                        riskCalculation.score > 70 ? "#ef4444" :
-                        riskCalculation.score > 45 ? "#f97316" : "#22c55e"
+                       riskCalculation?.score ?? 0
                       }
                       strokeWidth="10"
                       fill="transparent"
@@ -485,9 +575,9 @@ export default function DashboardView({ weatherData, currentCity }) {
               {/* Aggregated vulnerability details */}
               <div className="space-y-3.5 pt-4 border-t border-slate-100">
                 <span className="block text-2xs font-bold text-slate-400 uppercase tracking-wider">Active Risk Multipliers</span>
-                {riskCalculation.modifiers.length > 0 ? (
+                {(riskCalculation?.modifiers || []).length > 0 ? (
                   <div className="space-y-2">
-                    {riskCalculation.modifiers.map((mod, idx) => (
+                    {(riskCalculation?.modifiers || []).map((mod, idx) => (
                       <div key={idx} className="flex items-start gap-2.5">
                         <span className="p-0.5 rounded-full bg-orange-100 text-orange-600 mt-0.5">
                           <AlertTriangle className="h-3 w-3" />
@@ -501,7 +591,7 @@ export default function DashboardView({ weatherData, currentCity }) {
                     <CheckCircle2 className="h-4.5 w-4.5" />
                     <span className="text-xs font-semibold">No active multipliers. Health profile represents optimal threshold tolerance.</span>
                   </div>
-                )}
+              )}
               </div>
             </div>
 

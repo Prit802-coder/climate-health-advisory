@@ -1,43 +1,80 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
 import { Building2, AlertTriangle, ShieldAlert, Thermometer, Wind, RefreshCw, Layers } from 'lucide-react';
-import { getHospitalBurden } from '../utils/flaskApi';
+import {
+  getHospitalBurden,
+  getHospitalFacilities
+} from '../utils/flaskApi';
 
 export default function HospitalDashboardView() {
   const [activeFacility, setActiveFacility] = useState('city-general');
-  const [burdenPredictionData, setBurdenPredictionData] = useState([
-    { date: 'Mon', admissions: 18, temp: 24, pm25: 48, expected: 15 },
-    { date: 'Tue', admissions: 22, temp: 26, pm25: 58, expected: 17 },
-    { date: 'Wed', admissions: 31, temp: 31, pm25: 82, expected: 26 },
-    { date: 'Thu', admissions: 42, temp: 34, pm25: 110, expected: 38 },
-    { date: 'Fri', admissions: 58, temp: 36, pm25: 135, expected: 48 },
-    { date: 'Sat', admissions: 39, temp: 27, pm25: 88, expected: 32 },
-    { date: 'Sun', admissions: 24, temp: 22, pm25: 42, expected: 20 }
-  ]);
+  const [loadingFacilities, setLoadingFacilities] = useState(true);
+  const [burdenPredictionData, setBurdenPredictionData] = useState([]);
 
-  // Simulated facility data
-  const facilities = [
-    { id: 'city-general', name: 'Metropolitan General Hospital', bedsOccupied: 142, bedsTotal: 180, congestion: 'High', alertLevel: 'yellow' },
-    { id: 'westside-clinic', name: 'Westside Pulmonary Center', bedsOccupied: 45, bedsTotal: 85, congestion: 'Moderate', alertLevel: 'green' },
-    { id: 'pediatric-emergency', name: 'Saint Jude Pediatric Emergency', bedsOccupied: 72, bedsTotal: 80, congestion: 'Critical', alertLevel: 'red' }
-  ];
-
-  const facility = facilities.find(f => f.id === activeFacility) || facilities[0];
+  const [facilities, setFacilities] = useState([]);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const data = await getHospitalBurden(activeFacility);
-        setBurdenPredictionData(data);
-      } catch (err) {
-        // Fallback to default mock details already populated
-        console.log("Failed to load facility data from Flask. Keeping mock data.");
-      }
-    }
-    loadData();
-  }, [activeFacility]);
+  async function loadFacilities() {
+    try {
+      const data = await getHospitalFacilities();
 
-  const getAlertClass = (level) => {
+      setFacilities(data);
+
+      if (data.length > 0) {
+        setActiveFacility(current =>
+          data.some(f => f.id === current) ? current : data[0].id
+        );
+      }
+    } catch (err) {
+      console.error('Failed to load hospital facilities:', err);
+    } finally {
+      setLoadingFacilities(false);
+    }
+  }
+
+  loadFacilities();
+}, []);
+
+  const facility = facilities.find(f => f.id === activeFacility);
+
+  const peakDay = burdenPredictionData.reduce(
+  (max, item) => item.admissions > max.admissions ? item : max,
+  burdenPredictionData[0]
+);
+
+const increasePercent = peakDay?.expected > 0
+  ? Math.round(
+      ((peakDay.admissions - peakDay.expected) / peakDay.expected) * 100
+    )
+  : 0;
+
+  useEffect(() => {
+  async function loadData() {
+    try {
+      const data = await getHospitalBurden(activeFacility);
+
+      if (Array.isArray(data)) {
+        setBurdenPredictionData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load hospital burden statistics:', err);
+    }
+  }
+
+  if (activeFacility) {
+    loadData();
+  }
+}, [activeFacility]);
+
+if (loadingFacilities) {
+  return <div className="p-6 text-slate-500">Loading hospital facilities...</div>;
+}
+
+if (!facility) {
+  return <div className="p-6 text-red-600">Unable to load hospital facilities.</div>;
+}
+
+const getAlertClass = (level) => {
     switch (level) {
       case 'red': return 'text-red-700 bg-red-50 border-red-200';
       case 'yellow': return 'text-orange-600 bg-orange-50 border-orange-200';
@@ -47,6 +84,13 @@ export default function HospitalDashboardView() {
   };
 
   const getAlertBg = (level) => {
+    if (loadingFacilities) {
+      return <div className="p-6 text-slate-500">Loading hospital facilities...</div>;
+    }
+
+    if (!facility) {
+      return <div className="p-6 text-red-600">Unable to load hospital facilities.</div>;
+    }
     switch (level) {
       case 'red': return 'bg-red-500';
       case 'yellow': return 'bg-orange-500';
@@ -66,6 +110,7 @@ export default function HospitalDashboardView() {
 
         {/* Facility Selector */}
         <select
+          disabled={loadingFacilities || facilities.length === 0}
           value={activeFacility}
           onChange={(e) => setActiveFacility(e.target.value)}
           className="p-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 self-start md:self-center"
@@ -154,7 +199,9 @@ export default function HospitalDashboardView() {
           <div className="text-xs space-y-1.5">
             <span className="font-extrabold block">Resource Controller Recommendation Alert</span>
             <p className="leading-relaxed text-slate-700">
-              Based on the 7-day temperature and ozone trend, patient inflows are expected to rise by **35% on Friday**. We advise increasing paramedic shifts, checking oxygen reservoir pressures, and reserving 8 cardiac emergency beds in anticipation of hot-climate respiratory admissions.
+              {peakDay
+                ? `The highest recorded admission value is ${peakDay.admissions} on ${peakDay.date}, compared with ${peakDay.expected} expected admissions (${increasePercent}% difference). Review staffing levels, oxygen availability, and emergency bed capacity at ${facility.name}.`
+                : 'No hospital admission data is currently available.'}
             </p>
           </div>
         </div>

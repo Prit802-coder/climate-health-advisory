@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Sun, CloudRain, Cloud, CloudLightning, Snowflake, CloudFog, Sunrise, Sunset, Heart, Calendar } from 'lucide-react';
+import { getForecast } from '../services/api';
 
-export default function ForecastView() {
+export default function ForecastView({ currentCity = 'New Delhi' }) {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
-  // Mock 7-day forecast data with weather and health indices
-  const forecastData = [
+  // 7-day forecast data with weather and health indices
+  const [forecastData, setForecastData] = useState([
     { day: 'Mon', index: 82, temp: 24, aqi: 48, uv: 4, allergen: 'Low', condition: 'sunny', desc: 'Mild temperatures and clean air.' },
     { day: 'Tue', index: 76, temp: 26, aqi: 58, uv: 6, allergen: 'Medium', condition: 'sunny', desc: 'Warm day with rising pollen.' },
     { day: 'Wed', index: 59, temp: 31, aqi: 82, uv: 8, allergen: 'High', condition: 'sunrise', desc: 'High thermal heat loading and allergen spikes.' },
@@ -14,9 +15,23 @@ export default function ForecastView() {
     { day: 'Fri', index: 38, temp: 36, aqi: 135, uv: 10, allergen: 'Very High', condition: 'thunderstorm', desc: 'Severe heat index combined with thunder-induced asthma risk.' },
     { day: 'Sat', index: 65, temp: 27, aqi: 88, uv: 5, allergen: 'Medium', condition: 'rainy', desc: 'Showers washing out airborne particulate matter.' },
     { day: 'Sun', index: 88, temp: 22, aqi: 42, uv: 4, allergen: 'Low', condition: 'sunset', desc: 'Cool breeze and excellent air purification post-rain.' }
-  ];
+  ]);
 
-  const selectedDay = forecastData[selectedDayIndex];
+  useEffect(() => {
+    async function loadForecast() {
+      try {
+        const data = await getForecast(currentCity);
+        if (Array.isArray(data) && data.length > 0) {
+          setForecastData(data);
+        }
+      } catch (err) {
+        console.log("Using cached 7-day forecast data:", err.message);
+      }
+    }
+    loadForecast();
+  }, [currentCity]);
+
+  const selectedDay = forecastData[selectedDayIndex] || forecastData[0];
 
   // Helper to render weather icons
   const getWeatherIcon = (condition, className = "h-6 w-6") => {

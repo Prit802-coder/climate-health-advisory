@@ -1,8 +1,8 @@
-import { getWeather } from "./services/api";
+import { getWeather, loginUser, registerUser, logoutUser } from "./services/api";
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sun, Wind, Thermometer, Sparkles, Search, Menu, X, Shield, Clock, Calendar, 
-  Map, Brain, AlertCircle, Building2, HelpCircle, Heart, ChevronRight, LogIn, UserPlus
+  Map, Brain, AlertCircle, Building2, HelpCircle, Heart, ChevronRight, LogIn, UserPlus, User
 } from 'lucide-react';
 
 // Subcomponents / Views
@@ -51,6 +51,71 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+
+  // Auth state
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("clima_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupError, setSignupError] = useState('');
+
+  const handleLogout = () => {
+    logoutUser();
+    setCurrentUser(null);
+  };
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      const res = await loginUser(loginEmail, loginPassword);
+      setCurrentUser(res.user);
+      setShowLogin(false);
+      setLoginEmail('');
+      setLoginPassword('');
+    } catch (err) {
+      setLoginError(err.response?.data?.detail || err.message || "Invalid credentials");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
+    setSignupLoading(true);
+    setSignupError('');
+    try {
+      const res = await registerUser({
+        full_name: signupName,
+        email: signupEmail,
+        password: signupPassword
+      });
+      setCurrentUser(res.user);
+      setShowSignup(false);
+      setSignupName('');
+      setSignupEmail('');
+      setSignupPassword('');
+    } catch (err) {
+      setSignupError(err.response?.data?.detail || err.message || "Failed to create account");
+    } finally {
+      setSignupLoading(false);
+    }
+  };
   
   // Choose random weather condition on startup
   const [weatherCondition, setWeatherCondition] = useState('sunny');
@@ -68,9 +133,38 @@ export default function App() {
   const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Load initial city telemetry from backend on mount
+  useEffect(() => {
+    handleSelectCity('New Delhi');
+  }, []);
+
+  // Sync hero background condition with real weather data
+  useEffect(() => {
+    if (weatherData?.condition) {
+      const cond = weatherData.condition.toLowerCase();
+      if (cond.includes('rain')) setWeatherCondition('rainy');
+      else if (cond.includes('cloud')) setWeatherCondition('cloudy');
+      else if (cond.includes('storm')) setWeatherCondition('thunderstorm');
+      else if (cond.includes('snow')) setWeatherCondition('snow');
+      else if (cond.includes('fog') || cond.includes('mist') || cond.includes('haze')) setWeatherCondition('fog');
+      else setWeatherCondition('sunny');
+    }
+  }, [weatherData]);
+
   const currentCityData = useMemo(() => {
+    if (weatherData) {
+      return {
+        temp: Math.round(weatherData.temperature ?? weatherData.temp ?? 28),
+        aqi: weatherData.aqi ?? 70,
+        uv: weatherData.uv ?? 4,
+        allergen: weatherData.allergen ?? 'Medium',
+        healthIndex: weatherData.climate_health_index ?? Math.max(20, Math.min(100, Math.round(100 - ((weatherData.aqi || 70) / 3)))),
+        condition: (weatherData.condition || 'sunny').toLowerCase(),
+        desc: weatherData.description || 'Real-time environmental sensor data.'
+      };
+    }
     return CITY_DATABASE[currentCityName] || CITY_DATABASE['New Delhi'];
-  }, [currentCityName]);
+  }, [weatherData, currentCityName]);
 
   // Suggestions search list
   const filteredSuggestions = useMemo(() => {
@@ -90,12 +184,7 @@ export default function App() {
     const data = await getWeather(city);
     setWeatherData(data);
   } catch (err) {
-    console.error(err);
-    if (err.response) {
-      alert(err.response.data.error || "City not found");
-    } else {
-      alert("Cannot connect to server. Please make sure the backend is running.");
-    }
+    console.warn("Could not fetch live weather, using database baseline:", err.message);
   } finally {
     setLoading(false);
   }
@@ -182,31 +271,51 @@ export default function App() {
 
           {/* Login / Auth Actions */}
           <div className="hidden lg:flex items-center gap-2">
-            <button
-              onClick={() => setShowLogin(true)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition
-                ${
-                  showLogin
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                }`}
-            >
-              <LogIn size={18} />
-              <span>Log In</span>
-            </button>
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 border border-blue-200/60 rounded-xl text-blue-700 font-bold text-xs shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <User size={14} />
+                  <span>{currentUser.full_name}</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                  title="Log Out"
+                >
+                  <LogIn size={15} className="rotate-180" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl transition text-xs font-bold
+                    ${
+                      showLogin
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                    }`}
+                >
+                  <LogIn size={16} />
+                  <span>Log In</span>
+                </button>
 
-            <button
-              onClick={() => setShowSignup(true)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition
-                ${
-                  showSignup
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                }`}
-            >
-              <UserPlus size={18} />
-              <span>Sign Up</span>
-            </button>
+                <button
+                  onClick={() => setShowSignup(true)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl transition text-xs font-bold
+                    ${
+                      showSignup
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                    }`}
+                >
+                  <UserPlus size={16} />
+                  <span>Sign Up</span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -235,13 +344,36 @@ export default function App() {
                 {item.name}
               </button>
             ))}
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-100">
-              <button className="flex items-center justify-center gap-2 py-3 border border-slate-250 text-slate-700 font-bold text-xs rounded-xl">
-                <LogIn className="h-4.5 w-4.5" /> Log In
-              </button>
-              <button className="flex items-center justify-center gap-2 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl">
-                <UserPlus className="h-4.5 w-4.5" /> Sign Up
-              </button>
+            <div className="pt-4 border-t border-slate-100">
+              {currentUser ? (
+                <div className="flex items-center justify-between p-3 bg-blue-50/70 rounded-xl">
+                  <div className="flex items-center gap-2 text-xs font-bold text-blue-700">
+                    <User size={15} />
+                    <span>{currentUser.full_name}</span>
+                  </div>
+                  <button
+                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                    className="text-xs font-bold text-red-600 hover:text-red-700"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => { setShowLogin(true); setMobileMenuOpen(false); }}
+                    className="flex items-center justify-center gap-2 py-3 border border-slate-250 text-slate-700 font-bold text-xs rounded-xl"
+                  >
+                    <LogIn className="h-4.5 w-4.5" /> Log In
+                  </button>
+                  <button 
+                    onClick={() => { setShowSignup(true); setMobileMenuOpen(false); }}
+                    className="flex items-center justify-center gap-2 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl"
+                  >
+                    <UserPlus className="h-4.5 w-4.5" /> Sign Up
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -397,21 +529,6 @@ export default function App() {
                   <span className="text-3xs font-bold text-blue-600 flex items-center gap-1 mt-1 group">
                     Detailed index breakdown <ChevronRight className="h-3 w-3" />
                   </span>
-
-                  <button
-                     type="button"
-                      onClick={() => {
-                      console.log("Login clicked");
-
-                      // temporary success message
-                      alert("Login successful");
-
-                      setShowLogin(false);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded"
-                  >
-                    Login
-                  </button>
                 </div>
 
                 {/* Card 2: AI Health Advisory Summary */}
@@ -570,17 +687,22 @@ export default function App() {
             <div className="glass-card rounded-3xl p-6 md:p-8 border border-slate-200/40 bg-white/90 backdrop-blur-md shadow-sm">
               {activeTab === 'Dashboard' && (
                 <DashboardView 
-                  weatherData={weatherData} 
+                  weatherData={weatherData || currentCityData} 
                   currentCity={currentCityName} 
+                  currentUser={currentUser}
                 />
               )}
 
               {activeTab === 'Climate Health Index' && (
-                <ClimateHealthIndexView />
+                <ClimateHealthIndexView 
+                  currentCityData={currentCityData}
+                />
               )}
 
               {activeTab === 'Forecast' && (
-                <ForecastView />
+                <ForecastView 
+                  currentCity={currentCityName}
+                />
               )}
 
               {activeTab === 'Risk Maps' && (
@@ -595,7 +717,9 @@ export default function App() {
               )}
 
               {activeTab === 'Citizen Reports' && (
-                <CitizenReportsView />
+                <CitizenReportsView 
+                  currentUser={currentUser}
+                />
               )}
 
               {activeTab === 'Hospital Dashboard' && (
@@ -611,103 +735,151 @@ export default function App() {
       </main>
 
         {showLogin && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+            <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-100">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <LogIn className="h-5 w-5 text-blue-600" /> Log In
+                </h2>
+                <button 
+                  onClick={() => { setShowLogin(false); setLoginError(''); }}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-            <div className="bg-white p-6 rounded-xl w-80">
+              {loginError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+                  {loginError}
+                </div>
+              )}
 
-              <h2 className="text-xl mb-4">
-                Login
-              </h2>
+              <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="doctor@example.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full border border-slate-200 p-3 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-
-                  console.log("Login clicked");
-                  alert("Login successful");
-
-                  setShowLogin(false);
-                }}
-              >
-
-                <input
-                  type="email"
-                  placeholder="Email"
-                  className="border p-2 w-full mb-3 rounded"
-                  required
-                />
-
-                <input
-                  type="password"
-                  placeholder="Password"
-                  className="border p-2 w-full mb-3 rounded"
-                  required
-                />
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full border border-slate-200 p-3 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
 
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded w-full"
+                  disabled={loginLoading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer disabled:opacity-60"
                 >
-                  Login
+                  {loginLoading ? "Authenticating..." : "Sign In to ClimaCare"}
                 </button>
 
+                <p className="text-center text-2xs text-slate-400 pt-2">
+                  Don't have an account?{' '}
+                  <button 
+                    type="button" 
+                    onClick={() => { setShowLogin(false); setShowSignup(true); }}
+                    className="text-blue-600 font-bold hover:underline"
+                  >
+                    Register here
+                  </button>
+                </p>
               </form>
-
             </div>
-
           </div>
         )}
 
         {showSignup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white p-6 rounded-xl w-80">
-              <h2 className="text-xl font-semibold mb-4">
-                Sign Up
-              </h2>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+            <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-100">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-blue-600" /> Create Account
+                </h2>
+                <button 
+                  onClick={() => { setShowSignup(false); setSignupError(''); }}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  alert("Account created successfully!");
-                  setShowSignup(false);
-                }}
-                className="space-y-4"
-              >
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  className="w-full border rounded-lg px-3 py-2"
-                  required
-                />
+              {signupError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+                  {signupError}
+                </div>
+              )}
 
-                <input
-                  type="email"
-                  placeholder="Email"
-                  className="w-full border rounded-lg px-3 py-2"
-                  required
-                />
+              <form onSubmit={handleSignupSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Dr. Pritam Sharma"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    className="w-full border border-slate-200 p-3 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
 
-                <input
-                  type="password"
-                  placeholder="Password"
-                  className="w-full border rounded-lg px-3 py-2"
-                  required
-                />
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="doctor@example.com"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    className="w-full border border-slate-200 p-3 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-2xs font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+                  <input
+                    type="password"
+                    placeholder="Minimum 6 characters"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    className="w-full border border-slate-200 p-3 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    minLength={6}
+                  />
+                </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                  disabled={signupLoading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer disabled:opacity-60"
                 >
-                  Create Account
+                  {signupLoading ? "Registering..." : "Create ClimaCare Account"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowSignup(false)}
-                  className="w-full border py-2 rounded-lg"
-                >
-                  Cancel
-                </button>
+                <p className="text-center text-2xs text-slate-400 pt-2">
+                  Already registered?{' '}
+                  <button 
+                    type="button" 
+                    onClick={() => { setShowSignup(false); setShowLogin(true); }}
+                    className="text-blue-600 font-bold hover:underline"
+                  >
+                    Log in here
+                  </button>
+                </p>
               </form>
             </div>
           </div>

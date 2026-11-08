@@ -1,12 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sliders, Sun, Wind, Thermometer, Sparkles, ShieldCheck, ShieldAlert, Info } from 'lucide-react';
 
-export default function ClimateHealthIndexView() {
+export default function ClimateHealthIndexView({ currentCityData }) {
   // Simulator parameters
-  const [aqi, setAqi] = useState(65);
-  const [temp, setTemp] = useState(26);
-  const [uv, setUv] = useState(5);
+  const [aqi, setAqi] = useState(currentCityData?.aqi || 65);
+  const [temp, setTemp] = useState(currentCityData?.temp || 26);
+  const [uv, setUv] = useState(currentCityData?.uv || 5);
   const [pollen, setPollen] = useState(25);
+
+  useEffect(() => {
+    if (currentCityData) {
+      if (currentCityData.aqi !== undefined) setAqi(currentCityData.aqi);
+      if (currentCityData.temp !== undefined) setTemp(currentCityData.temp);
+      if (currentCityData.uv !== undefined) setUv(currentCityData.uv);
+    }
+  }, [currentCityData]);
 
   // Compute composite score dynamically
   // 100 is perfect, 0 is highly dangerous
